@@ -1,0 +1,124 @@
+# Workflow name
+name: Frontend Continuous Integration
+
+# Triggers for the workflow
+on:
+  # Manual trigger using the workflow_dispatch event
+  workflow_dispatch:
+  # Automatic trigger on pull request events targeting the main branch
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'starter/frontend/**'
+
+env:
+  # Set Node.js Version
+  NODE_VERSION: '18.x'
+  BACKEND_URL: ${{ secrets.REACT_APP_MOVIE_API_URL }}
+
+# Jobs defined in the workflow
+jobs:
+  # Lint Job
+  LINT-JOB:
+    runs-on: ubuntu-latest
+    
+    environment:
+          name: development
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup NodeJS
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{env.NODE_VERSION}}
+      
+      - name: Restore cache
+        uses: actions/cache@v3
+        id: npm-cache
+        with:
+          path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+    
+      - name: Install dependencies
+        run: cd starter/frontend && npm ci
+
+      - name: Running linter
+        id: lint
+        run: cd starter/frontend && npm run lint --fix
+
+  # Test Job
+  TEST-JOB:
+    runs-on: ubuntu-latest
+    
+    environment:
+          name: development
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup NodeJS
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{env.NODE_VERSION}}
+      
+      - name: Restore cache
+        uses: actions/cache@v3
+        id: npm-cache
+        with:
+          path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+    
+      - name: Install dependencies
+        run: cd starter/frontend && npm ci
+
+      - name: Tests
+        id: tests
+        run: cd starter/frontend && npm run test
+
+  BUILD-JOB:
+    needs: [LINT-JOB, TEST-JOB]
+    runs-on: ubuntu-latest
+    
+    environment:
+          name: development
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup NodeJS
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{env.NODE_VERSION}}
+      
+      - name: Restore cache
+        uses: actions/cache@v3
+        id: npm-cache
+        with:
+          path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+    
+      - name: Install dependencies
+        run: cd starter/frontend && npm ci
+
+      - name: Tests
+        id: tests
+        run: cd starter/frontend && npm run test
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build the docker image
+        run: |
+              cd starter/frontend
+              docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${GITHUB_SHA::7} .
